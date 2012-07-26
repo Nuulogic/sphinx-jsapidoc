@@ -1,0 +1,254 @@
+#!/usr/bin/env python
+
+"""
+SYNOPSIS
+
+    sphinx-jsapidoc [options] -o <output_path> <source_path>
+
+DESCRIPTION
+
+    TODO This describes how to use this script.
+    This docstring will be printed by the script if there is an error or
+    if the user requests help (-h or --help).
+
+EXAMPLES
+
+    TODO: Show some examples of how to use this script.
+
+EXIT STATUS
+
+    TODO: List exit codes
+
+AUTHOR
+
+    TODO: Name <name@example.org>
+
+LICENSE
+
+    This script is in the public domain.
+
+VERSION
+
+    
+"""
+
+import sys
+import os
+import traceback
+import optparse
+import time
+from os.path import *
+import glob
+from operator import itemgetter, attrgetter
+
+import sphinxjsapidoc
+#from pexpect import run, spawn
+
+# Uncomment the following section if you want readline history support.
+#import readline, atexit
+#histfile = os.path.join(os.environ['HOME'], '.TODO_history')
+#try:
+#    readline.read_history_file(histfile)
+#except IOError:
+#    pass
+#atexit.register(readline.write_history_file, histfile)
+
+def main ():
+
+    global options, args
+
+    if options.source is not None:
+        source_path = options.source[0]
+
+        # TODO: exclude paths
+        if len(options.source) > 1:
+            exclude_paths = options.source[1:len(options.source)-1]
+
+        classes = {}
+        if os.path.exists(source_path) and os.path.isdir(source_path):
+            classes = sphinxjsapidoc.parse_directory(source_path)
+        else:
+            print('source "'+source_path+'" must be a directory.')
+            return 404
+
+        output_dir = options.output_dir
+
+        if output_dir is not None:
+            if not os.path.exists(output_dir) and not os.path.isdir(output_dir):
+                print('output directory ' + output_dir + ' must be a directory.')
+                return 404
+
+        def order_by_namespace(a,b):
+            if a[1].namespace > b[1].namespace:
+                return 1
+            if a[1].namespace < b[1].namespace:
+                return -1
+            return 0
+
+        classes = sorted(classes.iteritems(), cmp=order_by_namespace)
+
+        if classes is None or len(classes) == 0:
+            print('No documentation found.')
+            return 500
+        
+        #generate the template files
+        
+        #generate templates and files in dir on a 1-to-1 ratio rather than every class a template file
+        #package paradigm
+        current_namespace = None
+        namespaces = []
+
+        #loop through all the classes
+        for class_tuple in classes:
+            class_name = class_tuple[0]
+            class_dictionary = class_tuple[1]
+
+            if current_namespace != class_dictionary.namespace:
+                current_namespace = class_dictionary.namespace
+                if current_namespace not in namespaces:
+                    namespaces.append(current_namespace)
+                template = sphinxjsapidoc.underline(class_dictionary.namespace[class_dictionary.namespace.rfind('.')+1:len(class_dictionary.namespace)] + ' Package', '=') + '\n\n\n'
+
+            if len(class_dictionary.short_name) > 0:
+                template += sphinxjsapidoc.underline(':mod:`'+ class_dictionary.short_name +'` Module', '-') + '\n\n'
+            else:
+                template += sphinxjsapidoc.underline(':mod:`'+ class_dictionary.name +'` Module', '-') + '\n\n'
+            
+            template += '.. js:class:: ' + class_name + '('
+            if class_dictionary.constructor is not None:
+                template += ', '.join(class_dictionary.constructor.params)
+
+            template += ')\n'
+
+            if class_dictionary.base is not None:
+                template += '\n    *extends* :js:class:`' + class_dictionary.base + '`'
+
+            template += '\n'
+
+            if len(class_dictionary.docstring) > 0:
+                template += sphinxjsapidoc.fix_roles(sphinxjsapidoc.indent(class_dictionary.docstring, '    '))
+
+            template += '\n'
+
+
+
+            if len(class_dictionary.class_attributes) > 0:
+                template += '\n' + sphinxjsapidoc.sandwich('Static Attributes') + '\n'
+
+            #loop through static attributes for the class.
+            for att in class_dictionary.class_attributes:
+                template += '.. js:attribute:: ' + att.name + '\n'
+                if len(att.docstring) > 0:
+                    template += sphinxjsapidoc.fix_roles(sphinxjsapidoc.indent(att.docstring, '    '))
+                template += '\n'
+
+
+
+
+            if len(class_dictionary.static_methods) > 0:
+                template += '\n' + sphinxjsapidoc.sandwich('Static Methods') + '\n'
+
+            #loop through static methods for the class.
+            for method in class_dictionary.static_methods:
+                template += '.. js:function:: ' + method.name + '('
+                template += ', '.join(method.params)
+                template += ')\n'
+
+                if len(method.docstring) > 0:
+                    template += sphinxjsapidoc.fix_roles(sphinxjsapidoc.indent(method.docstring, '    '))
+                template += '\n'
+
+
+            if len(class_dictionary.attributes) > 0:
+                template += '\n' + sphinxjsapidoc.sandwich('Attributes') + '\n'
+            
+            #loop through attributes for the class.
+            for att in class_dictionary.attributes:
+                template += '.. js:attribute:: ' + class_name + '.' + att.name + '\n'
+                if len(att.docstring) > 0:
+                    template += sphinxjsapidoc.fix_roles(sphinxjsapidoc.indent(att.docstring, '    '))
+                template += '\n'
+
+
+
+            if len(class_dictionary.methods):
+                template += "\n" + sphinxjsapidoc.sandwich('Methods') + "\n"
+
+            #loop through methods for the class.
+            for method in class_dictionary.methods:
+                template += '.. js:function:: ' + class_name + '.' + method.name + '('
+                template += ', '.join(method.params)
+                template += ')\n'
+
+                if len(method.docstring) > 0:
+                    template += sphinxjsapidoc.fix_roles(sphinxjsapidoc.indent(method.docstring, '    '))
+                template += '\n'
+
+            if output_dir is None:
+                print(template)
+            else:
+                fh = open(os.path.join(os.path.realpath(output_dir), current_namespace + '.rst'), 'w')
+                fh.write(template)
+                fh.close()
+
+            
+        #generate the toc
+        #
+        #toc name
+        #========
+        #
+        #.. toctree::
+        #   :maxdepth: 4
+        #
+        #   hi5
+
+        if output_dir is not None:
+            toc = sphinxjsapidoc.underline('Modules')
+            toc += '\n\n'
+            toc += '.. toctree::\n\n'
+
+            for namespace in namespaces:
+                toc += '    ' + namespace + '\n'
+
+            fh = open(os.path.join(os.path.realpath(output_dir), 'jsmodules.rst'), 'w')
+            fh.write(toc)
+            fh.close()
+
+
+
+
+if __name__ == '__main__':
+    try:
+        start_time = time.time()
+        parser = optparse.OptionParser(
+                formatter=optparse.TitledHelpFormatter(),
+                usage=globals()['__doc__'],
+                version='$Id: py.tpl 332 2008-10-21 22:24:52Z root $')
+
+        #add options here
+        parser.add_option('-v', '--verbose', action='store_true', default=False, help='verbose output')
+        parser.add_option('-o', '--output-dir', help="Destination to output rst")
+        parser.add_option('-f', '--force', help="Overwrite all files.")
+
+        (options, args) = parser.parse_args()
+        #if len(args) < 1:
+        #    parser.error ('missing argument')
+        options.source = parser.largs
+
+        if options.verbose: print time.asctime()
+        exit_code = main()
+        if exit_code is None:
+            exit_code = 0
+        if options.verbose: print time.asctime()
+        if options.verbose: print 'TOTAL TIME IN MINUTES:',
+        if options.verbose: print (time.time() - start_time) / 60.0
+        sys.exit(exit_code)
+    except KeyboardInterrupt, e: # Ctrl-C
+        raise e
+    except SystemExit, e: # sys.exit()
+        raise e
+    except Exception, e:
+        print 'ERROR, UNEXPECTED EXCEPTION'
+        print str(e)
+        traceback.print_exc()
+        os._exit(1)
