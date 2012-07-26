@@ -80,10 +80,10 @@ Installation
 Generation
 ----------
 
-#. You'll want to go through the steps of setting up `sphinx-quickstart` first. The output from `sphinx-jsapidoc` is meant to be dropped into the documentation's source directory (Not the javascript source, but the source quickstart creates.)
-#. Run these things once your code is documented: `$ ./sphinx-jsapidoc --output-dir /path/to/docs/documentation/source/ /path/to/source/files/with/js/must/be/a/directory/`
-#. Add `jsmodules` to the `toctree` in your `index.rst`
-#. When you `make html` sphinx should do it's normal bits
+- You'll want to go through the steps of setting up `sphinx-quickstart` first. The output from `sphinx-jsapidoc` is meant to be dropped into the documentation's source directory (Not the javascript source, but the source quickstart creates.)
+- Run these things once your code is documented: `$ ./sphinx-jsapidoc --output-dir /path/to/docs/documentation/source/ /path/to/source/files/with/js/must/be/a/directory/`
+- Add `jsmodules` to the `toctree` in your `index.rst`
+- When you `make html` sphinx should do it's normal bits
 
 
 
